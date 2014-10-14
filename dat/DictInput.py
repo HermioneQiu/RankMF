@@ -67,7 +67,7 @@ if __name__ == "__main__":
     fpart = rootDir+"part.dat"
     ftrain = rootDir+"train.dat"
     ftest = rootDir +"test.dat"
-    personNum= 500
+    personNum= 200
     trainRate = 0.9
     input = DictInput(finput, fpart, ftrain, ftest,personNum, trainRate)
     print "finished"

@@ -1,4 +1,7 @@
-#file : user_id: item_id, item_id, item_id ...
+# in_file : user_id: item_id, item_id, item_id ...
+# out_file1: train -- user_id\t item_id, item_id, item_id...
+# out_file2: test -- user_id\t item_id, item_id, item_id...
+
 class CrossInput:
     def __init__(self, ftrain, K):
         self.ftrain = ftrain
@@ -67,6 +70,7 @@ if __name__  == "__main__":
     K = 4
     crossInput = CrossInput(ftrain, K)
     crossInput.divide(K, rootDir)
+    print "cross finished"
     
     
     

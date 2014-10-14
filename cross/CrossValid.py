@@ -9,8 +9,8 @@ from utils.coms import *
 #**************************************
 class CrossValid:
     
-    def __init__(self, frate,ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
-        self.frate = frate
+    def __init__(self, ftrain,ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
+        self.frate = ftrain
         self.ftest = ftest
         self.F = F
         self.max_iretate = max_iretate

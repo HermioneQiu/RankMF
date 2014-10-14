@@ -1,20 +1,11 @@
+# --- binary ratings ----
+# the item_id == item_index, so it remove the burden of build item_dict and user_dict
 import random
 from utils.coms import *
-from math import *
+import math  
 import copy
 
-def g(x):
-    """sigmoid function"""
-    return 1/(1+exp(-x))
-
-def dg(x):
-    """derivative of sigmoid function"""
-    return exp(x)/(1+exp(x))**2
-
-# ---dataset epinions social networks----
-# --- binary ratings ----
-
-class CLIMF:
+class LMF:
     
     def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
         self.ftrain = ftrain
@@ -23,7 +14,6 @@ class CLIMF:
         self.max_iretate = max_iretate
         self.learnRate = learnRate
         self.regularRate = regularRate
-        # read userDict, and itemDict
         self.userNum = userNum
         self.itemNum = itemNum
         # initial userF and itemF
@@ -32,16 +22,21 @@ class CLIMF:
         # no rating, only binary, so no bias
         self.predict = []
         self.trainMatrix = []
-        
         self.initial()
         
+        self.userBasket = {}
+        self.testUserBasket = {}
+        self.negUserBasket = {}
+        
         self.readTrainMatrix()
-        # *** weighted train matrix ****
-
+        self.readUserBasket()
+        self.getNegUserBasket()
+        
+        self.readTestUserBasket()
+        
         # ---train---
         self.train()
         # ---get predict---
-#         self.predict(user_i, item_i)
         self.predictAll()
         self.savePredict(fpredict)
         
@@ -49,8 +44,8 @@ class CLIMF:
         userNum = self.userNum
         itemNum = self.itemNum
         F = self.F
-        self.userF = [[random.random()/sqrt(F) for f_i in range(self.F)] for i in range(userNum)]
-        self.itemF = [[random.random()/sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
+        self.userF = [[random.random()/math.sqrt(F) for i in range(self.F)] for i in range(userNum)]
+        self.itemF = [[random.random()/math.sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
         self.predict = [[0 for i in range(itemNum)] for j in range(userNum)]
         self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]
         
@@ -65,40 +60,67 @@ class CLIMF:
             itemIds = itemId_str.strip().split(",")
             itemIds = [int(itemId) for itemId in itemIds]
             for itemId in itemIds:
-                trainMatrix[userId][itemId] = 1
-        
-    def train(self):
-        learnRate = self.learnRate
-        regularRate = self.regularRate
-        for iret_i in range(self.max_iretate):
-            print "iret_i: ", iret_i
-            self.MAP_SGD(learnRate, regularRate)
-            self.predictAll()
-            MAP = self.train_MAP()
-            print "MAP: ", MAP
-        
-    def train_MAP(self):
-        trainMatrix = self.trainMatrix
-        predict = self.predict
-        userNum = len(predict)
+                trainMatrix[userId][itemId] = 1    
+                
+    def readUserBasket(self):
+        userBasket = self.userBasket
+        Ftrain = open(self.ftrain, "r")
+        line = Ftrain.readline()
+        while line:
+            userId, itemId_str = line.strip().split("\t")
+            userId = int(userId)
+            itemIds = itemId_str.strip().split(",")
+            itemIds = [int(itemId) for itemId in itemIds]
+            userBasket[userId] = itemIds
+            line = Ftrain.readline()
+        Ftrain.close()
+#         print "origin: ",userBasket[0]
+    def readTestUserBasket(self):
+        Ftest = open(self.ftest, 'r')
+        testUserBasket = self.testUserBasket
+        for line in Ftest:
+            userId, itemId_str = line.strip().split("\t")
+            userId = int(userId)
+            itemIds = itemId_str.strip().split(",")
+            itemIds = [int(itemId) for itemId in itemIds]
+            testUserBasket[userId] = itemIds
+        Ftest.close()
+#         print "test: ", testUserBasket[0]
+    def getNegUserBasket(self):
+        trainUserBasket = self.userBasket
+        testUserBasket = self.testUserBasket
+        userNum = self.userNum
         itemNum = self.itemNum
-        MAP = 0
+        negUserBasket = self.negUserBasket
         for user_i in range(userNum):
-            pos_items = self.abstract_pos(trainMatrix[user_i])
-            if len(pos_items) == 0:
-                userNum -= 1
-                continue
-            tmp_MAP = 0
-            for item_i in pos_items:
-                tmp_MAP += log( self.sigmod(predict[user_i][item_i]) )
-                for item_j in range(itemNum):
-                    tmp_MAP += log( 1 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
-            tmp_MAP = tmp_MAP/len(pos_items)
-            MAP += tmp_MAP
-        MAP = MAP/float(userNum)
-        return MAP
-    
-#     def test_MAP_function(self):
+            n_items = []
+            t_items = []
+            if user_i in trainUserBasket.keys():
+                tr_items = trainUserBasket[user_i]
+            te_items = []
+            if user_i in testUserBasket.keys():
+                te_items = testUserBasket[user_i]  
+                
+            for item_i in range(itemNum):
+                if (item_i not in te_items ) & (item_i not in tr_items):
+                    n_items.append(item_i)
+            negUserBasket[user_i] = n_items
+#         print "neg:",negUserBasket[0]
+        
+    def OCCF_user(self):
+        trainMatrix = self.trainMatrix
+        userBasket = self.userBasket
+        userNum = self.userNum
+        itemNum = self.itemNum
+        for user_i in range(userNum):
+            if user_i in userBasket.keys():
+                num_item = len(userBasket[user_i])
+                # need to be redefined ***
+                weight_user = 1 - float(num_item)/itemNum
+                for item_i in range(itemNum):
+                    if trainMatrix[user_i][item_i] == 0:
+                        trainMatrix[user_i][item_i] = weight_user
+                    
     def MAP_SGD(self, learnRate, regularRate):
         trainMatrix = self.trainMatrix
         userNum = len(trainMatrix)
@@ -107,7 +129,6 @@ class CLIMF:
         itemF = self.itemF
         F = self.F
         
-
         for user_i in range(userNum):
             oldUserF = copy.deepcopy(userF)
             # 1.update user_vector
@@ -135,24 +156,45 @@ class CLIMF:
                     item_delta -= regularRate*itemF[item_i][f_i]
                     itemF[item_i][f_i] += learnRate*item_delta
                     
-    def abstract_pos(self, List):  
-        new_list = []                  
+    def train(self):
+        learnRate = self.learnRate
+        regularRate = self.regularRate
+        for iret_i in range(self.max_iretate):
+            print "iret_i: ", iret_i
+            self.MAP_SGD(learnRate, regularRate)
+            train_MAP = self.MAP_for_train()
+            print "train error: ", train_MAP
+            
+    def MAP_for_train(self):
+        trainMatrix = self.trainMatrix
+        predict = self.predict
+        userNum = len(predict)
+        itemNum = self.itemNum
+        MAP = 0
+        for user_i in range(userNum):
+            pos_items = self.abstract_pos(trainMatrix[user_i])
+            if len(pos_items) == 0:
+                userNum -= 1
+                continue
+            tmp_MAP = 0
+            for item_i in pos_items:
+                tmp_MAP += math.log( self.sigmod(predict[user_i][item_i]) )
+                for item_j in range(itemNum):
+                    tmp_MAP += math.log( 1 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
+            tmp_MAP = tmp_MAP/len(pos_items)
+            MAP += tmp_MAP
+        MAP = MAP/float(userNum)
+        return MAP    
+                       
+#     def MAP_for_test(self):
+    
+    def abstract_pos(self, List):              
+        new_list = []
         for i in List:
             if i == 1:
                 new_list.append(i)
         return new_list
-    
-    # **** functions used by SGD ******
-    def sigmod(self, x):
-        return 1/(1+exp(-x))
-    def dsigmod(self, x):
-        return exp(-x)/pow(1+exp(-x),2)
-    
-    # **** ********************* ******               
-    def saveModel(self, fUserF, fItemF):
-        saveMatrix(fUserF, self.userF)
-        saveMatrix(fItemF, self.itemF)
-        
+            
     def predictone(self, user_i ,item_i):
         userF = self.userF
         itemF = self.itemF
@@ -161,11 +203,19 @@ class CLIMF:
             rate += userF[user_i][f_i]*itemF[item_i][f_i]
         return rate
     
+#     def batchGD(self):
+#     def predict(self, userId): 
+        # sort and get K result
     def predictAll(self):
         predict = self.predict
         for user_i in range(self.userNum):
+#             print "user_i: ",user_i
             for item_i in range(self.itemNum):
                 predict[user_i][item_i] = self.predictone(user_i, item_i) 
+                
+    def saveModel(self, fUserF, fItemF):
+        saveMatrix(fUserF, self.userF)
+        saveMatrix(fItemF, self.itemF)    
                 
     def savePredict(self, fresult):
         Fresult = open(fresult, "w")
@@ -176,6 +226,7 @@ class CLIMF:
             lineStr = ",".join(userRate)+"\n"
             Fresult.write(lineStr)
         Fresult.close()
+        
     # cost function to judge iretation process
 #     def cost(self):        
         
@@ -189,10 +240,11 @@ if __name__ == "__main__":
     F = 50
     max_iretate = 20
     learnRate = 0.001
-    regularRate = 0.1
+    regularRate = 0.01
     # --- train ---
-    lmf = CLIMF(ftrain , ftest,fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
+    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---
     print "finished"
     
-             
+    
+        

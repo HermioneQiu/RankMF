@@ -29,20 +29,23 @@ class LMF:
         self.negUserBasket = {}
         
         self.readTrainMatrix()
+#         print self.trainMatrix[0]
         self.readUserBasket()
-        
+        self.OCCF_user_item()
+#         print self.trainMatrix[0]
         self.readTestUserBasket()
         self.getNegUserBasket()
-        
+          
         # ---train---
         self.train()
         # ---get predict---
         self.predictAll()
         self.savePredict(fpredict)
-        
+          
     def initial(self):
         userNum = self.userNum
         itemNum = self.itemNum
+        
         F = self.F
         self.userF = [[random.random()/math.sqrt(F) for i in range(self.F)] for i in range(userNum)]
         self.itemF = [[random.random()/math.sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
@@ -107,19 +110,35 @@ class LMF:
             negUserBasket[user_i] = n_items
 #         print "neg:",negUserBasket[0]
         
-    def OCCF_user(self):
+    def OCCF_user_item(self):
+        # 1. userBasket
         trainMatrix = self.trainMatrix
         userBasket = self.userBasket
         userNum = self.userNum
         itemNum = self.itemNum
+        # 2.itemBasket
+        itemBasket = {}
+        for user_i in userBasket.keys():
+            item_is = userBasket[user_i]
+            for item_i in item_is:
+                if item_i not in itemBasket.keys():
+                    itemBasket[item_i] = [user_i]
+                else:
+                    itemBasket[item_i].append(user_i)
+        # 3. user_item_Num average
         for user_i in range(userNum):
-            if user_i in userBasket.keys():
-                num_item = len(userBasket[user_i])
-                # need to be redefined ***
-                weight_user = 1 - float(num_item)/itemNum
-                for item_i in range(itemNum):
-                    if trainMatrix[user_i][item_i] == 0:
-                        trainMatrix[user_i][item_i] = weight_user
+            for item_i in range(itemNum):
+                if trainMatrix[user_i][item_i] == 0:
+                    weight_user = weight_item = 0
+                    if user_i in userBasket.keys():
+                        num_item = len(userBasket[user_i])
+                        # need to be redefined ***
+                        weight_user = 1 - float(num_item)/itemNum
+                    if item_i in itemBasket.keys():
+                        num_user = len(itemBasket[item_i])
+                        weight_item = 1- float(num_user)/userNum
+                    weight = (weight_user + weight_item)/2
+                    trainMatrix[user_i][item_i] = weight
                     
     def MAP_SGD(self, learnRate, regularRate):
         trainMatrix = self.trainMatrix
@@ -248,14 +267,16 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 100
-    itemNum = 100
+    
+    userNum = 50
+    itemNum = 50
     F = 10
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_imp_predict.dat0"
+    fpredict = froot + para_str+"_MAP_user_item_weight_predict.dat0"
+     
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---

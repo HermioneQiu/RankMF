@@ -1,44 +1,40 @@
-# --- binary ratings ----
-# the item_id == item_index, so it remove the burden of build item_dict and user_dict
 import random
 from utils.coms import *
 import math  
 import copy
 
-class LMF:
-    
+class iMF:
     def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
-        self.ftrain = ftrain
-        self.ftest = ftest
-        self.F = F
-        self.max_iretate = max_iretate
-        self.learnRate = learnRate
-        self.regularRate = regularRate
+        self.train = ftrain
+        self.test = ftest
+        self.fpredcit = fpredict
         self.userNum = userNum
         self.itemNum = itemNum
-        # initial userF and itemF
+        self.F = F
+        self.max_iretate = max_iretate
+        self.regularRate = regularRate
+        self.learnRate = learnRate
+        # 0. initial parameters
         self.userF = []
         self.itemF = []
-        # no rating, only binary, so no bias
         self.predict = []
         self.trainMatrix = []
         self.initial()
+                
+        # 1. read trainMatrix
+        self.readTrainMatrix()
         
+        # 2. train
+        self.train()
+        self.predictAll()
+        self.savePredict(fpredict)
+        # 3. evaluate
         self.userBasket = {}
         self.testUserBasket = {}
         self.negUserBasket = {}
+        # 3.1 read userBasket
         
-        self.readTrainMatrix()
-        self.readUserBasket()
-        
-        self.readTestUserBasket()
-        self.getNegUserBasket()
-        
-        # ---train---
-        self.train()
-        # ---get predict---
-        self.predictAll()
-        self.savePredict(fpredict)
+        # 3.2 read testUserBasket
         
     def initial(self):
         userNum = self.userNum
@@ -47,7 +43,7 @@ class LMF:
         self.userF = [[random.random()/math.sqrt(F) for i in range(self.F)] for i in range(userNum)]
         self.itemF = [[random.random()/math.sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
         self.predict = [[0 for i in range(itemNum)] for j in range(userNum)]
-        self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]
+        self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]        
         
     # complete train matrix
     def readTrainMatrix(self):
@@ -60,8 +56,8 @@ class LMF:
             itemIds = itemId_str.strip().split(",")
             itemIds = [int(itemId) for itemId in itemIds]
             for itemId in itemIds:
-                trainMatrix[userId][itemId] = 1    
-                
+                trainMatrix[userId][itemId] = 1          
+    
     def readUserBasket(self):
         userBasket = self.userBasket
         Ftrain = open(self.ftrain, "r")
@@ -105,81 +101,22 @@ class LMF:
                 if (item_i not in te_items ) & (item_i not in tr_items):
                     n_items.append(item_i)
             negUserBasket[user_i] = n_items
-#         print "neg:",negUserBasket[0]
-        
-    def OCCF_user(self):
-        trainMatrix = self.trainMatrix
-        userBasket = self.userBasket
-        userNum = self.userNum
-        itemNum = self.itemNum
-        for user_i in range(userNum):
-            if user_i in userBasket.keys():
-                num_item = len(userBasket[user_i])
-                # need to be redefined ***
-                weight_user = 1 - float(num_item)/itemNum
-                for item_i in range(itemNum):
-                    if trainMatrix[user_i][item_i] == 0:
-                        trainMatrix[user_i][item_i] = weight_user
-                    
-    def MAP_SGD(self, learnRate, regularRate):
-        trainMatrix = self.trainMatrix
-        userNum = len(trainMatrix)
-        itemNum = len(trainMatrix[0])
-        userF = self.userF
-        itemF = self.itemF
-        F = self.F
-        userBasket = self.userBasket
-        flag = 0
-        for user_i in range(userNum):
-            if user_i not in userBasket.keys():
-#                 print "no item for user: ", user_i
-                continue
-#             print userBasket[user_i]
-            oldUserF = copy.deepcopy(userF)
-            # 1.update user_vector
-            for f_i in range(F):
-                user_delta = 0
-                pos_items = self.abstract_pos(trainMatrix[user_i])
-#                 print pos_items
-                for item_i in pos_items:
-                    p_val_i = self.predictone(user_i, item_i)
-                    user_delta += self.sigmod(-p_val_i)*itemF[item_i][f_i]
-                    for item_j in range(itemNum):
-                        p_val_j = self.predictone(user_i, item_j)
-                        user_delta += self.dsigmod(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(2-self.sigmod(p_val_j - p_val_i))
-                user_delta -= regularRate*userF[user_i][f_i]
-#                 userF[user_i][f_i] += learnRate*user_delta
-                userF[user_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*user_delta
-                
-            for item_i in pos_items:
-                p_val_i = self.predictone(user_i, item_i)
-                # 2. update item_vector
-                for f_i in range(F):
-                    item_delta = 0
-                    item_delta += self.sigmod(-p_val_i)*userF[user_i][f_i] 
-                    for item_j in range(itemNum):
-                        p_val_j = self.predictone(user_i, item_j)
-                        item_delta += ( self.dsigmod(p_val_i - p_val_j)*( 1/(2-self.sigmod(p_val_j - p_val_i)) - 1/(2-self.sigmod(p_val_i - p_val_j)) ) )*oldUserF[user_i][f_i]
-                    item_delta -= regularRate*itemF[item_i][f_i]
-                    itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*item_delta
-                    
-    # **** functions used by SGD ******
-    def sigmod(self, x):
-        return 1/(1+math.exp(-x))
-    def dsigmod(self, x):
-        return math.exp(-x)/pow(1+math.exp(-x),2)     
-                   
+            
     def train(self):
         learnRate = self.learnRate
         regularRate = self.regularRate
         for iret_i in range(self.max_iretate):
             print "iret_i: ", iret_i
-            self.MAP_SGD(learnRate, regularRate)
+            self.RMSE_SGD(learnRate, regularRate)
             # update all predict data before calculate errors
             self.predictAll()
             train_MAP = self.MAP_for_train()
-            print "train error: ", train_MAP
+            print "train MAP error: ", train_MAP
+            train_RMSE = self.RMSE_for_train()
+            print "train RMSE error: ", train_RMSE
             
+#     def RMSE_SGD(self):
+        
     def MAP_for_train(self):
         trainMatrix = self.trainMatrix
         predict = self.predict
@@ -199,16 +136,6 @@ class LMF:
             MAP += tmp_MAP
         MAP = MAP/float(userNum)
         return MAP    
-                       
-#     def MAP_for_test(self):
-    
-    def abstract_pos(self, List):              
-        new_list = []
-        for l_i in range(len(List)):
-            if List[l_i] == 1:
-                new_list.append(l_i)
-        return new_list
-            
     def predictone(self, user_i ,item_i):
         userF = self.userF
         itemF = self.itemF
@@ -239,27 +166,6 @@ class LMF:
             userRate = [str(u) for u in userRate]
             lineStr = ",".join(userRate)+"\n"
             Fresult.write(lineStr)
-        Fresult.close()
+        Fresult.close()   
         
-    # cost function to judge iretation process
-#     def cost(self):        
-        
-if __name__ == "__main__":
-    froot = "E:\\workspace\\MF\\data\\cross\\"
-    ftrain = froot + "train.dat0"
-    ftest = froot + "test.dat0"
-    userNum = 100
-    itemNum = 100
-    F = 10
-    max_iretate = 20
-    learnRate = 0.1
-    regularRate = 0.1
-    para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_imp_predict.dat0"
-    # --- train ---
-    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
-    # --- get predict ---
-    print "finished"
     
-    
-        

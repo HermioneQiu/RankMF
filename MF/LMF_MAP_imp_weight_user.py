@@ -30,10 +30,11 @@ class LMF:
         
         self.readTrainMatrix()
         self.readUserBasket()
-        
+        self.OCCF_user()
         self.readTestUserBasket()
         self.getNegUserBasket()
-        
+#         
+         
         # ---train---
         self.train()
         # ---get predict---
@@ -43,6 +44,7 @@ class LMF:
     def initial(self):
         userNum = self.userNum
         itemNum = self.itemNum
+        
         F = self.F
         self.userF = [[random.random()/math.sqrt(F) for i in range(self.F)] for i in range(userNum)]
         self.itemF = [[random.random()/math.sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
@@ -248,14 +250,16 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 100
-    itemNum = 100
+    
+    userNum = 50
+    itemNum = 50
     F = 10
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_imp_predict.dat0"
+    fpredict = froot + para_str+"_MAP_user_weight_predict.dat0"
+     
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---

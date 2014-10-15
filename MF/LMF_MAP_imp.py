@@ -128,33 +128,40 @@ class LMF:
         userF = self.userF
         itemF = self.itemF
         F = self.F
-        
+        userBasket = self.userBasket
+        flag = 0
         for user_i in range(userNum):
+            if user_i not in userBasket.keys():
+#                 print "no item for user: ", user_i
+                continue
+#             print userBasket[user_i]
             oldUserF = copy.deepcopy(userF)
             # 1.update user_vector
             for f_i in range(F):
                 user_delta = 0
                 pos_items = self.abstract_pos(trainMatrix[user_i])
+#                 print pos_items
                 for item_i in pos_items:
                     p_val_i = self.predictone(user_i, item_i)
                     user_delta += self.sigmod(-p_val_i)*itemF[item_i][f_i]
-                    for item_j in pos_items:
+                    for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
-                        user_delta += self.dsigmod(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(1-self.sigmod(p_val_j - p_val_i))
+                        user_delta += self.dsigmod(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(2-self.sigmod(p_val_j - p_val_i))
                 user_delta -= regularRate*userF[user_i][f_i]
-                userF[user_i][f_i] += learnRate*user_delta
-            
+#                 userF[user_i][f_i] += learnRate*user_delta
+                userF[user_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*user_delta
+                
             for item_i in pos_items:
                 p_val_i = self.predictone(user_i, item_i)
                 # 2. update item_vector
                 for f_i in range(F):
                     item_delta = 0
                     item_delta += self.sigmod(-p_val_i)*userF[user_i][f_i] 
-                    for item_j in pos_items:
+                    for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
-                        item_delta += ( self.dsigmod(p_val_i - p_val_j)*( 1/(1-self.sigmod(p_val_j - p_val_i)) - 1/(1-self.sigmod(p_val_i - p_val_j)) ) )*userF[user_i][f_i]
+                        item_delta += ( self.dsigmod(p_val_i - p_val_j)*( 1/(2-self.sigmod(p_val_j - p_val_i)) - 1/(2-self.sigmod(p_val_i - p_val_j)) ) )*oldUserF[user_i][f_i]
                     item_delta -= regularRate*itemF[item_i][f_i]
-                    itemF[item_i][f_i] += learnRate*item_delta
+                    itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*item_delta
                     
     # **** functions used by SGD ******
     def sigmod(self, x):
@@ -188,8 +195,7 @@ class LMF:
             for item_i in pos_items:
                 tmp_MAP += math.log( self.sigmod(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP += math.log( 1 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
-            tmp_MAP = tmp_MAP/len(pos_items)
+                    tmp_MAP += math.log( 2 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
             MAP += tmp_MAP
         MAP = MAP/float(userNum)
         return MAP    
@@ -198,9 +204,9 @@ class LMF:
     
     def abstract_pos(self, List):              
         new_list = []
-        for i in List:
-            if i == 1:
-                new_list.append(i)
+        for l_i in range(len(List)):
+            if List[l_i] == 1:
+                new_list.append(l_i)
         return new_list
             
     def predictone(self, user_i ,item_i):
@@ -243,12 +249,12 @@ if __name__ == "__main__":
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
     fpredict = froot + "MAPpredict.dat0"
-    userNum = 200
-    itemNum = 200
-    F = 50
-    max_iretate = 50
-    learnRate = 0.001
-    regularRate = 0.01
+    userNum = 50
+    itemNum = 50
+    F = 10
+    max_iretate = 20
+    learnRate = 0.1
+    regularRate = 0.1
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---

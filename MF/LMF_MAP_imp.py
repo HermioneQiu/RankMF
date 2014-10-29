@@ -46,7 +46,7 @@ class LMF:
         F = self.F
         self.userF = [[random.random()/math.sqrt(F) for i in range(self.F)] for i in range(userNum)]
         self.itemF = [[random.random()/math.sqrt(F) for f_i in range(self.F)] for i in range(itemNum)]
-        self.predict = [[0 for i in range(itemNum)] for j in range(userNum)]
+        self.predict = [[random.random() for i in range(itemNum)] for j in range(userNum)]
         self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]
         
     # complete train matrix
@@ -146,6 +146,9 @@ class LMF:
                     user_delta += self.sigmoid(-p_val_i)*itemF[item_i][f_i]
                     for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
+                        print p_val_i, p_val_j
+                        if p_val_j == p_val_i:
+                            continue
                         user_delta += self.dsigmoid(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(2-self.sigmoid(p_val_j - p_val_i))
                 user_delta -= regularRate*userF[user_i][f_i]
 #                 userF[user_i][f_i] += learnRate*user_delta
@@ -159,6 +162,8 @@ class LMF:
                     item_delta += self.sigmoid(-p_val_i)*userF[user_i][f_i] 
                     for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
+                        if p_val_i == p_val_j:
+                            continue
                         item_delta += ( self.dsigmoid(p_val_i - p_val_j)*( 1/(2-self.sigmoid(p_val_j - p_val_i)) - 1/(2-self.sigmoid(p_val_i - p_val_j)) ) )*oldUserF[user_i][f_i]
                     item_delta -= regularRate*itemF[item_i][f_i]
                     itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*item_delta
@@ -193,9 +198,9 @@ class LMF:
                 continue
             tmp_MAP = 0
             for item_i in pos_items:
-                tmp_MAP += math.log( self.sigmoid(predict[user_i][item_i]) )
+                tmp_MAP += math.log(self.sigmoid(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP += math.log( 2 - self.sigmoid(predict[user_i][item_j] - predict[user_i][item_i]) )
+                    tmp_MAP += math.log(2 - self.sigmoid(predict[user_i][item_j]- predict[user_i][item_i] ) )
             MAP += tmp_MAP
         MAP = MAP/float(userNum)
         return MAP    
@@ -248,9 +253,9 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 200
-    itemNum = 200
-    F = 20
+    userNum = 50
+    itemNum = 50
+    F = 10
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1

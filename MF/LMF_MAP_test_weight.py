@@ -382,7 +382,7 @@ if __name__ == "__main__":
     userNum = 50
     itemNum = 50
     F = 10
-    max_iretate = 10
+    max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
     # user aspect
@@ -390,7 +390,7 @@ if __name__ == "__main__":
     # item aspect
     beta = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_weight_predict.dat0"
+    fpredict = froot + para_str + "_MAP_test_predict.dat0"
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate, alpha, beta)    
     # --- get predict ---

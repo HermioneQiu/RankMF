@@ -7,7 +7,7 @@ import copy
 
 class LMF:
     
-    def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate, alpha, beta):
+    def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
         self.ftrain = ftrain
         self.ftest = ftest
         self.F = F
@@ -34,13 +34,6 @@ class LMF:
         self.readTestUserBasket()
         self.getNegUserBasket()
         
-        self.trainItemBasket = {}
-        self.getTrainItemBasket()
-        
-        self.alpha = alpha
-        self.beta = beta
-        self.bias_matrix = []
-        self.calc_bias()
         # ---train---
         self.train()
         # ---get predict---
@@ -56,41 +49,6 @@ class LMF:
         self.predict = [[random.random() for i in range(itemNum)] for j in range(userNum)]
         self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]
         
-    def getTrainItemBasket(self):  
-        trainUserBasket = self.userBasket
-        trainItemBasket = self.trainItemBasket
-        
-        for user_i in trainUserBasket.keys():
-            item_list = trainUserBasket[user_i]
-            for item_i in item_list:
-                if item_i in trainItemBasket.keys():
-                    trainItemBasket[item_i].append(user_i)
-                else:
-                    trainItemBasket[item_i] = [user_i]    
-                    
-    def calc_bias(self):
-        trainItemBasket = self.trainItemBasket
-        trainUserBasket = self.userBasket
-        bias_matrix = self.bias_matrix
-        bias_matrix = [[0 for i in range(self.itemNum)] for j in range(self.userNum)]
-        userNum = self.userNum
-        itemNum = self.itemNum
-        alpha =self.alpha
-        beta = self.beta
-        
-        for user_i in range(self.userNum):
-            item_num = 0
-            if user_i in trainUserBasket.keys():
-                item_num = len(trainUserBasket[user_i])
-            for item_i in range(self.itemNum):
-                user_num = 0
-                if item_i in trainItemBasket.keys():
-                    user_num = len(trainItemBasket[item_i])
-                tmp = alpha*(float(user_num)/userNum) + beta * (float(item_num)/itemNum)
-                
-                bias_matrix[user_i][item_i] = self.remove_tail(tmp)
-        self.bias_matrix = bias_matrix
-            
     # complete train matrix
     def readTrainMatrix(self):
         # 0 for missing examples
@@ -171,15 +129,13 @@ class LMF:
         itemF = self.itemF
         F = self.F
         userBasket = self.userBasket
-        bias_matrix = self.bias_matrix
-        
+        flag = 0
         for user_i in range(userNum):
             if user_i not in userBasket.keys():
 #                 print "no item for user: ", user_i
                 continue
 #             print userBasket[user_i]
             oldUserF = copy.deepcopy(userF)
-            oldItemF = copy.deepcopy(itemF)
             # 1.update user_vector
             for f_i in range(F):
                 user_delta = 0
@@ -223,11 +179,6 @@ class LMF:
                         
                     item_delta -= regularRate*itemF[item_i][f_i]
                     itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) ) * learnRate*item_delta
-                     # 0. for weight optimization
-                    item_delta = 2 * bias_matrix[user_i][item_i] * self.sigmoid(p_val_i) * self.dsigmoid(p_val_i) * oldUserF[user_i][f_i]
-                    itemF[item_i][f_i] += learnRate * item_delta 
-                    user_delta = 2 * bias_matrix[user_i][item_i] * self.sigmoid(p_val_i) * self.dsigmoid(p_val_i) * oldItemF[item_i][f_i]
-                    userF[user_i][f_i] == learnRate * user_delta
                     
             # 2.2 for negative examples
             for item_i in neg_items:
@@ -242,12 +193,7 @@ class LMF:
                     
                     item_delta -= regularRate*itemF[item_i][f_i]
                     itemF[item_i][f_i] += ( 1/float(itemNum) ) * learnRate*item_delta
-                     # 0. for weight optimization
-                    item_delta = 2 * bias_matrix[user_i][item_i] * (self.sigmoid(p_val_i)-1) * self.dsigmoid(p_val_i) * oldUserF[user_i][f_i]
-                    itemF[item_i][f_i] += learnRate * item_delta 
-                    user_delta = 2 * bias_matrix[user_i][item_i] * (self.sigmoid(p_val_i)-1) * self.dsigmoid(p_val_i) * oldItemF[item_i][f_i]
-                    userF[user_i][f_i] == learnRate * user_delta
-                                     
+                    
     # **** functions used by SGD ******
     def sigmoid(self, x):
         return 1/(1+math.exp(-x))
@@ -266,60 +212,26 @@ class LMF:
             train_MAP = self.MAP_for_train()
             print "train error: ", train_MAP
             
-# MAP version 1  
-#     def MAP_for_train(self):
-#         trainMatrix = self.trainMatrix
-#         predict = self.predict
-#         userNum = len(predict)
-#         itemNum = self.itemNum
-#         MAP = 0
-#         for user_i in range(userNum):
-#             pos_items = self.abstract_pos(trainMatrix[user_i])
-#             if len(pos_items) == 0:
-#                 userNum -= 1
-#                 continue
-#             tmp_MAP = 0
-#             for item_i in pos_items:
-#                 tmp_MAP += math.log(self.sigmoid(predict[user_i][item_i]) )
-#                 for item_j in range(itemNum):
-#                     tmp_MAP += math.log(self.sigmoid( predict[user_i][item_i]-predict[user_i][item_j] ) )
-#             MAP += tmp_MAP
-#         MAP = MAP/float(userNum)
-#         return MAP
-    
-# MAP version 2
     def MAP_for_train(self):
         trainMatrix = self.trainMatrix
         predict = self.predict
         userNum = len(predict)
         itemNum = self.itemNum
         MAP = 0
-        none_num = 0
-        
-        tmp_MAP_base = 0
-        tmp_MAP_weight = 0
         for user_i in range(userNum):
             pos_items = self.abstract_pos(trainMatrix[user_i])
-            neg_items = self.abstract_neg(trainMatrix[user_i])
             if len(pos_items) == 0:
-                none_num -= 1
+                userNum -= 1
                 continue
-            # 1. for positive ones
+            tmp_MAP = 0
             for item_i in pos_items:
-                tmp_MAP_base += math.log( self.sigmoid(predict[user_i][item_i]) )
+                tmp_MAP += math.log(self.sigmoid(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP_base += math.log( self.sigmoid(predict[user_i][item_i] - predict[user_i][item_j]) )
-                tmp_MAP_weight += self.sigmoid(predict[user_i][item_i])
-            # 2. for negative ones
-            for item_i in neg_items:
-                tmp_MAP_weight += self.sigmoid(1 - predict[user_i][item_i])
-        tmp_MAP_base = tmp_MAP_base/(float((userNum - none_num) * (len(pos_items) + itemNum)))
-        tmp_MAP_weight = tmp_MAP_weight/(float(userNum*itemNum) )
-        MAP = tmp_MAP_base + tmp_MAP_weight
-        
-        print "map_base: ", tmp_MAP_base     
-        print "map_weight:", tmp_MAP_weight
-        return MAP               
+                    tmp_MAP += math.log(self.sigmoid( predict[user_i][item_i]-predict[user_i][item_j] ) )
+            MAP += tmp_MAP
+        MAP = MAP/float(userNum)
+        return MAP    
+                       
 #     def MAP_for_test(self):
     
     def abstract_pos(self, List):              
@@ -368,10 +280,6 @@ class LMF:
             Fresult.write(lineStr)
         Fresult.close()
         
-    def remove_tail(self, raw_dat):
-        new_dat = float(int(raw_dat * 10000))/10000
-        return new_dat   
-     
     # cost function to judge iretation process
 #     def cost(self):        
         
@@ -382,17 +290,13 @@ if __name__ == "__main__":
     userNum = 50
     itemNum = 50
     F = 10
-    max_iretate = 10
+    max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
-    # user aspect
-    alpha = 0.2
-    # item aspect
-    beta = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_weight_predict.dat0"
+    fpredict = froot + para_str + "_MAP_test_predict.dat0"
     # --- train ---
-    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate, alpha, beta)    
+    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---
     print "finished"
     

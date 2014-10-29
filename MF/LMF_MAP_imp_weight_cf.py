@@ -7,9 +7,10 @@ import copy
 
 class LMF:
     
-    def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
+    def __init__(self, ftrain, ftest, fpredict, fcf, userNum, itemNum, F, max_iretate, learnRate, regularRate):
         self.ftrain = ftrain
         self.ftest = ftest
+        self.fcf = fcf
         self.F = F
         self.max_iretate = max_iretate
         self.learnRate = learnRate
@@ -29,14 +30,15 @@ class LMF:
         self.negUserBasket = {}
         
         self.readTrainMatrix()
+#         print self.trainMatrix[0]
         self.readUserBasket()
-        
+        self.OCCF_cf()
+#         print self.trainMatrix[0]
         self.readTestUserBasket()
         self.getNegUserBasket()
-        
-        # ---train---
+        # --- train ---
         self.train()
-        # ---get predict---
+        # --- get predict ---
         self.predictAll()
         self.savePredict(fpredict)
         
@@ -75,6 +77,7 @@ class LMF:
             line = Ftrain.readline()
         Ftrain.close()
 #         print "origin: ",userBasket[0]
+
     def readTestUserBasket(self):
         Ftest = open(self.ftest, 'r')
         testUserBasket = self.testUserBasket
@@ -86,6 +89,7 @@ class LMF:
             testUserBasket[userId] = itemIds
         Ftest.close()
 #         print "test: ", testUserBasket[0]
+
     def getNegUserBasket(self):
         trainUserBasket = self.userBasket
         testUserBasket = self.testUserBasket
@@ -107,19 +111,25 @@ class LMF:
             negUserBasket[user_i] = n_items
 #         print "neg:",negUserBasket[0]
         
-    def OCCF_user(self):
-        trainMatrix = self.trainMatrix
-        userBasket = self.userBasket
-        userNum = self.userNum
-        itemNum = self.itemNum
-        for user_i in range(userNum):
-            if user_i in userBasket.keys():
-                num_item = len(userBasket[user_i])
-                # need to be redefined ***
-                weight_user = 1 - float(num_item)/itemNum
-                for item_i in range(itemNum):
-                    if trainMatrix[user_i][item_i] == 0:
-                        trainMatrix[user_i][item_i] = weight_user
+    def OCCF_cf(self):
+        user_cf = self.read_cf()
+        for user_i in user_cf.keys():
+            item_ids = user_cf[user_i]
+            for item_i in item_ids:
+                
+            
+    def read_cf(self): 
+        file_cf = open(self.fcf,'r')
+        user_cf = {}
+        for line in file_cf:
+            segs = line.strip().split("\t")
+            if len(segs) != 2:
+                continue
+            user_id = int(segs[0])
+            item_ids = segs[1].strip().split(",")
+            item_ids = [int(item_id) for item_id in item_ids]
+            user_cf[user_id] = item_ids
+        return user_cf
                     
     def MAP_SGD(self, learnRate, regularRate):
         trainMatrix = self.trainMatrix
@@ -248,14 +258,15 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 200
-    itemNum = 200
-    F = 20
+    
+    userNum = 100
+    itemNum = 100
+    F = 10
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_imp_predict.dat0"
+    fpredict = froot + para_str+"_MAP_cf_weight_predict.dat0"
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---

@@ -124,8 +124,8 @@ if __name__ == "__main__":
         frecommend = rootDir +  "result\\recommend.dat"+str(k)
         ftrain = rootDir + "train.dat"+str(k)
         ftest = rootDir + "test.dat" +str(k)
-        K = 100
-        mf = CrossRecommend(fpredict, ftrain, frecommend, K)
+        recommend_num = 100
+        mf = CrossRecommend(fpredict, ftrain, frecommend, recommend_num)
         fscore = rootDir + "score.dat"+str(k)
         mf.saveScoreRecommend(fscore)   
         pr = PR(frecommend, ftest)

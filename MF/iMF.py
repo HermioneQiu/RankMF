@@ -130,12 +130,13 @@ class iMF:
                 continue
             tmp_MAP = 0
             for item_i in pos_items:
-                tmp_MAP += math.log( self.sigmod(predict[user_i][item_i]) )
+                tmp_MAP += math.log( self.sigmoid(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP += math.log( 2 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
+                    tmp_MAP += math.log( 2 - self.sigmoid(predict[user_i][item_j] - predict[user_i][item_i]) )
             MAP += tmp_MAP
         MAP = MAP/float(userNum)
         return MAP    
+    
     def predictone(self, user_i ,item_i):
         userF = self.userF
         itemF = self.itemF
@@ -144,9 +145,6 @@ class iMF:
             rate += userF[user_i][f_i]*itemF[item_i][f_i]
         return rate
     
-#     def batchGD(self):
-#     def predict(self, userId): 
-        # sort and get K result
     def predictAll(self):
         predict = self.predict
         for user_i in range(self.userNum):

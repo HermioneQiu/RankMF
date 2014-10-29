@@ -137,10 +137,10 @@ class LMF:
                 pos_items = self.abstract_pos(trainMatrix[user_i])
                 for item_i in pos_items:
                     p_val_i = self.predictone(user_i, item_i)
-                    user_delta += self.sigmod(-p_val_i)*itemF[item_i][f_i]
+                    user_delta += self.sigmoid(-p_val_i)*itemF[item_i][f_i]
                     for item_j in pos_items:
                         p_val_j = self.predictone(user_i, item_j)
-                        user_delta += self.dsigmod(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(1-self.sigmod(p_val_j - p_val_i))
+                        user_delta += self.dsigmoid(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(1-self.sigmoid(p_val_j - p_val_i))
                 user_delta -= regularRate*userF[user_i][f_i]
                 userF[user_i][f_i] += learnRate*user_delta
             
@@ -149,17 +149,17 @@ class LMF:
                 # 2. update item_vector
                 for f_i in range(F):
                     item_delta = 0
-                    item_delta += self.sigmod(-p_val_i)*userF[user_i][f_i] 
+                    item_delta += self.sigmoid(-p_val_i)*userF[user_i][f_i] 
                     for item_j in pos_items:
                         p_val_j = self.predictone(user_i, item_j)
-                        item_delta += ( self.dsigmod(p_val_i - p_val_j)*( 1/(1-self.sigmod(p_val_j - p_val_i)) - 1/(1-self.sigmod(p_val_i - p_val_j)) ) )*userF[user_i][f_i]
+                        item_delta += ( self.dsigmoid(p_val_i - p_val_j)*( 1/(1-self.sigmoid(p_val_j - p_val_i)) - 1/(1-self.sigmoid(p_val_i - p_val_j)) ) )*userF[user_i][f_i]
                     item_delta -= regularRate*itemF[item_i][f_i]
                     itemF[item_i][f_i] += learnRate*item_delta
                     
     # **** functions used by SGD ******
-    def sigmod(self, x):
+    def sigmoid(self, x):
         return 1/(1+math.exp(-x))
-    def dsigmod(self, x):
+    def dsigmoid(self, x):
         return math.exp(-x)/pow(1+math.exp(-x),2)     
                    
     def train(self):
@@ -186,9 +186,9 @@ class LMF:
                 continue
             tmp_MAP = 0
             for item_i in pos_items:
-                tmp_MAP += math.log( self.sigmod(predict[user_i][item_i]) )
+                tmp_MAP += math.log( self.sigmoid(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP += math.log( 1 - self.sigmod(predict[user_i][item_j] - predict[user_i][item_i]) )
+                    tmp_MAP += math.log( 1 - self.sigmoid(predict[user_i][item_j] - predict[user_i][item_i]) )
             tmp_MAP = tmp_MAP/len(pos_items)
             MAP += tmp_MAP
         MAP = MAP/float(userNum)

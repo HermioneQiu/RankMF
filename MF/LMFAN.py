@@ -230,13 +230,13 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    fpredict = froot + "MFpredict.dat0"
     userNum = 200
     itemNum = 200
-    F = 50
+    F = 20
     max_iretate = 20
     learnRate = 0.01
     regularRate = 0.1
+    fpredict = froot +str(userNum)+ "_AN_LMF_predict.dat0"
     # --- train ---
     lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---

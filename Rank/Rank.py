@@ -52,7 +52,7 @@ class Rank:
     
 if __name__ == "__main__":
     froot =  "E:\\workspace\\MF\\data\\cross\\"
-    fpredict = froot + "50_10_20_0.1_0.1_MAP_test_predict.dat0"
+    fpredict = froot + "300_30_20_0.1_0.1_MAP_test_predict.dat0"
     frank = froot + "MAPRank.dat0"
     rank = Rank(fpredict, frank)
     print "finished"

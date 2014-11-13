@@ -7,7 +7,7 @@ import copy
 
 class LMF:
     
-    def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate, alpha, beta):
+    def __init__(self, ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate):
         self.ftrain = ftrain
         self.ftest = ftest
         self.F = F
@@ -33,14 +33,6 @@ class LMF:
         
         self.readTestUserBasket()
         self.getNegUserBasket()
-        
-        self.trainItemBasket = {}
-        self.getTrainItemBasket()
-        
-        self.alpha = alpha
-        self.beta = beta
-        self.bias_matrix = []
-        self.calc_bias()
         # ---train---
         self.train()
         # ---get predict---
@@ -56,41 +48,6 @@ class LMF:
         self.predict = [[random.random() for i in range(itemNum)] for j in range(userNum)]
         self.trainMatrix = [[0 for i in range(itemNum)] for j in range(userNum)]
         
-    def getTrainItemBasket(self):  
-        trainUserBasket = self.userBasket
-        trainItemBasket = self.trainItemBasket
-        
-        for user_i in trainUserBasket.keys():
-            item_list = trainUserBasket[user_i]
-            for item_i in item_list:
-                if item_i in trainItemBasket.keys():
-                    trainItemBasket[item_i].append(user_i)
-                else:
-                    trainItemBasket[item_i] = [user_i]    
-                    
-    def calc_bias(self):
-        trainItemBasket = self.trainItemBasket
-        trainUserBasket = self.userBasket
-        bias_matrix = self.bias_matrix
-        bias_matrix = [[0 for i in range(self.itemNum)] for j in range(self.userNum)]
-        userNum = self.userNum
-        itemNum = self.itemNum
-        alpha =self.alpha
-        beta = self.beta
-        
-        for user_i in range(self.userNum):
-            item_num = 0
-            if user_i in trainUserBasket.keys():
-                item_num = len(trainUserBasket[user_i])
-            for item_i in range(self.itemNum):
-                user_num = 0
-                if item_i in trainItemBasket.keys():
-                    user_num = len(trainItemBasket[item_i])
-                tmp = alpha*(float(user_num)/userNum) + beta * (float(item_num)/itemNum)
-                
-                bias_matrix[user_i][item_i] = self.remove_tail(tmp)
-        self.bias_matrix = bias_matrix
-            
     # complete train matrix
     def readTrainMatrix(self):
         # 0 for missing examples
@@ -171,87 +128,97 @@ class LMF:
         itemF = self.itemF
         F = self.F
         userBasket = self.userBasket
-        bias_matrix = self.bias_matrix
-        
+        flag = 0
         for user_i in range(userNum):
             if user_i not in userBasket.keys():
 #                 print "no item for user: ", user_i
                 continue
 #             print userBasket[user_i]
             oldUserF = copy.deepcopy(userF)
-            oldItemF = copy.deepcopy(itemF)
             # 1.update user_vector
             for f_i in range(F):
                 user_delta = 0
                 pos_items = self.abstract_pos(trainMatrix[user_i])
-                neg_items = self.abstract_neg(trainMatrix[user_i])        
 #                 print pos_items
-                # 1.1 for positive examples
                 for item_i in pos_items:
                     p_val_i = self.predictone(user_i, item_i)
                     user_delta += self.sigmoid(-p_val_i)*itemF[item_i][f_i]
-                    # for all examples
                     for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
-#                         print p_val_i, p_val_j
-                        if abs(p_val_i - p_val_j) < 1e-3:
+                        print p_val_i, p_val_j
+                        if p_val_j == p_val_i:
                             continue
-                        user_delta += self.sigmoid(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])
+                        user_delta += self.dsigmoid(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(2-self.sigmoid(p_val_j - p_val_i))
                 user_delta -= regularRate*userF[user_i][f_i]
 #                 userF[user_i][f_i] += learnRate*user_delta
-                userF[user_i][f_i] += ( 1/float(len(userBasket[user_i]) * itemNum) ) * learnRate * user_delta
+                userF[user_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*user_delta
                 
-            # 2. update item_vector
-            # 2.1 for positive examples
             for item_i in pos_items:
                 p_val_i = self.predictone(user_i, item_i)
+                # 2. update item_vector
                 for f_i in range(F):
                     item_delta = 0
                     item_delta += self.sigmoid(-p_val_i)*userF[user_i][f_i] 
-                    # for positive
-                    for item_j in pos_items:
+                    for item_j in range(itemNum):
                         p_val_j = self.predictone(user_i, item_j)
-                        if abs(p_val_i - p_val_j) < 1e-3:
+                        if p_val_i == p_val_j:
                             continue
-                        item_delta -= self.sigmoid(p_val_j - p_val_i) * oldUserF[user_i][f_i]
-                    # for all
-                    for item_k in range(itemNum):
-                        p_val_k = self.predictone(user_i, item_k)
-                        if abs(p_val_i - p_val_k) < 1e-3:
-                            continue
-                        item_delta += self.sigmoid(p_val_k - p_val_i) * oldUserF[user_i][f_i]
-                        
+                        item_delta += ( self.dsigmoid(p_val_i - p_val_j)*( 1/(2-self.sigmoid(p_val_j - p_val_i)) - 1/(2-self.sigmoid(p_val_i - p_val_j)) ) )*oldUserF[user_i][f_i]
                     item_delta -= regularRate*itemF[item_i][f_i]
-                    itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) ) * learnRate*item_delta
-                     # 0. for weight optimization
-                    item_delta = 2 * bias_matrix[user_i][item_i] * self.sigmoid(p_val_i) * self.dsigmoid(p_val_i) * oldUserF[user_i][f_i]
-                    itemF[item_i][f_i] += learnRate * item_delta 
-                    user_delta = 2 * bias_matrix[user_i][item_i] * self.sigmoid(p_val_i) * self.dsigmoid(p_val_i) * oldItemF[item_i][f_i]
-                    userF[user_i][f_i] == learnRate * user_delta
-                    
-            # 2.2 for negative examples
-            for item_i in neg_items:
+                    itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*item_delta
+    def sample_MAP_SGD(self, learnRate, regularRate, N):
+        trainMatrix = self.trainMatrix
+        userNum = len(trainMatrix)
+        itemNum = len(trainMatrix[0])
+        userF = self.userF
+        itemF = self.itemF
+        F = self.F
+        userBasket = self.userBasket
+        flag = 0
+        for user_i in range(userNum):
+            if user_i not in userBasket.keys():
+#                 print "no item for user: ", user_i
+                continue
+#             print userBasket[user_i]
+            oldUserF = copy.deepcopy(userF)
+            # 1.update user_vector
+            for f_i in range(F):
+                user_delta = 0
+                pos_items = self.abstract_pos(trainMatrix[user_i])
+                all_items = range(itemNum)
+                
+                items_dict = self.sample_bigger(pos_items, all_items, user_i, N)
+#                 print pos_items
+                for item_i in pos_items:
+                    p_val_i = self.predictone(user_i, item_i)
+                    user_delta += self.sigmoid(-p_val_i)*itemF[item_i][f_i]
+                    sample_items = items_dict[item_i]
+                    for item_j in sample_items:
+                        p_val_j = self.predictone(user_i, item_j)
+                        print p_val_i, p_val_j
+                        if p_val_j == p_val_i:
+                            continue
+                        user_delta += self.dsigmoid(p_val_j - p_val_i)*(itemF[item_i][f_i] - itemF[item_j][f_i])/(2-self.sigmoid(p_val_j - p_val_i))
+                user_delta -= regularRate*userF[user_i][f_i]
+#                 userF[user_i][f_i] += learnRate*user_delta
+                userF[user_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*user_delta
+                
+            for item_i in pos_items:
                 p_val_i = self.predictone(user_i, item_i)
+                # 2. update item_vector
                 for f_i in range(F):
                     item_delta = 0
-                    for item_j in pos_items:
+                    item_delta += self.sigmoid(-p_val_i)*userF[user_i][f_i] 
+                    for item_j in sample_items:
                         p_val_j = self.predictone(user_i, item_j)
-                        if abs(p_val_i - p_val_k) < 1e-3:
+                        if p_val_i == p_val_j:
                             continue
-                        item_delta -= self.sigmoid(p_val_j - p_val_i) * oldUserF[user_i][f_i]
-                    
+                        item_delta += ( self.dsigmoid(p_val_i - p_val_j)*( 1/(2-self.sigmoid(p_val_j - p_val_i)) - 1/(2-self.sigmoid(p_val_i - p_val_j)) ) )*oldUserF[user_i][f_i]
                     item_delta -= regularRate*itemF[item_i][f_i]
-                    itemF[item_i][f_i] += ( 1/float(itemNum) ) * learnRate*item_delta
-                     # 0. for weight optimization
-                    item_delta = 2 * bias_matrix[user_i][item_i] * (self.sigmoid(p_val_i)-1) * self.dsigmoid(p_val_i) * oldUserF[user_i][f_i]
-                    itemF[item_i][f_i] += learnRate * item_delta 
-                    user_delta = 2 * bias_matrix[user_i][item_i] * (self.sigmoid(p_val_i)-1) * self.dsigmoid(p_val_i) * oldItemF[item_i][f_i]
-                    userF[user_i][f_i] == learnRate * user_delta
-                                     
+                    itemF[item_i][f_i] += ( 1/float(len(userBasket[user_i])) )*learnRate*item_delta                    
     # **** functions used by SGD ******
     def sigmoid(self, x):
         return 1/(1+math.exp(-x))
-    
     def dsigmoid(self, x):
         return math.exp(-x)/pow(1+math.exp(-x),2)     
                    
@@ -260,66 +227,32 @@ class LMF:
         regularRate = self.regularRate
         for iret_i in range(self.max_iretate):
             print "iret_i: ", iret_i
-            self.MAP_SGD(learnRate, regularRate)
+            self.sample_MAP_SGD(learnRate, regularRate, 50)
             # update all predict data before calculate errors
             self.predictAll()
             train_MAP = self.MAP_for_train()
             print "train error: ", train_MAP
             
-# MAP version 1  
-#     def MAP_for_train(self):
-#         trainMatrix = self.trainMatrix
-#         predict = self.predict
-#         userNum = len(predict)
-#         itemNum = self.itemNum
-#         MAP = 0
-#         for user_i in range(userNum):
-#             pos_items = self.abstract_pos(trainMatrix[user_i])
-#             if len(pos_items) == 0:
-#                 userNum -= 1
-#                 continue
-#             tmp_MAP = 0
-#             for item_i in pos_items:
-#                 tmp_MAP += math.log(self.sigmoid(predict[user_i][item_i]) )
-#                 for item_j in range(itemNum):
-#                     tmp_MAP += math.log(self.sigmoid( predict[user_i][item_i]-predict[user_i][item_j] ) )
-#             MAP += tmp_MAP
-#         MAP = MAP/float(userNum)
-#         return MAP
-    
-# MAP version 2
     def MAP_for_train(self):
         trainMatrix = self.trainMatrix
         predict = self.predict
         userNum = len(predict)
         itemNum = self.itemNum
         MAP = 0
-        none_num = 0
-        
-        tmp_MAP_base = 0
-        tmp_MAP_weight = 0
         for user_i in range(userNum):
             pos_items = self.abstract_pos(trainMatrix[user_i])
-            neg_items = self.abstract_neg(trainMatrix[user_i])
             if len(pos_items) == 0:
-                none_num -= 1
+                userNum -= 1
                 continue
-            # 1. for positive ones
+            tmp_MAP = 0
             for item_i in pos_items:
-                tmp_MAP_base += math.log( self.sigmoid(predict[user_i][item_i]) )
+                tmp_MAP += math.log(self.sigmoid(predict[user_i][item_i]) )
                 for item_j in range(itemNum):
-                    tmp_MAP_base += math.log( self.sigmoid(predict[user_i][item_i] - predict[user_i][item_j]) )
-                tmp_MAP_weight += self.sigmoid(predict[user_i][item_i])
-            # 2. for negative ones
-            for item_i in neg_items:
-                tmp_MAP_weight += self.sigmoid(1 - predict[user_i][item_i])
-        tmp_MAP_base = tmp_MAP_base/(float((userNum - none_num) * (len(pos_items) + itemNum)))
-        tmp_MAP_weight = tmp_MAP_weight/(float(userNum*itemNum) )
-        MAP = tmp_MAP_base + tmp_MAP_weight
-        
-        print "map_base: ", tmp_MAP_base     
-        print "map_weight:", tmp_MAP_weight
-        return MAP               
+                    tmp_MAP += math.log(2 - self.sigmoid(predict[user_i][item_j]- predict[user_i][item_i] ) )
+            MAP += tmp_MAP
+        MAP = MAP/float(userNum)
+        return MAP    
+                       
 #     def MAP_for_test(self):
     
     def abstract_pos(self, List):              
@@ -328,14 +261,7 @@ class LMF:
             if List[l_i] == 1:
                 new_list.append(l_i)
         return new_list
-    
-    def abstract_neg(self, List):
-        new_list = []
-        for l_i in range(len(List)):
-            if List[l_i] != 1:
-                new_list.append(l_i)
-        return new_list
-           
+            
     def predictone(self, user_i ,item_i):
         userF = self.userF
         itemF = self.itemF
@@ -368,31 +294,45 @@ class LMF:
             Fresult.write(lineStr)
         Fresult.close()
         
-    def remove_tail(self, raw_dat):
-        new_dat = float(int(raw_dat * 10000))/10000
-        return new_dat   
-     
-    # cost function to judge iretation process
-#     def cost(self):        
+    def sample_bigger(self, items_one, items_all, user_i, N):
+        ret_items = dict()
+        for item_i in items_one:
+            p_val_i = self.predictone(user_i, item_i)
+            tmp_delta = []
+            for item_j in items_all:
+                p_val_j = self.predictone(user_i, item_j)
+                tmp_delta.append(abs(p_val_j - p_val_i))
+            tmp_index  = self.rank_index(tmp_delta, N)
+            ret_items[item_i] = tmp_index
+        return ret_items
+    
+    def rank_index(self, tmp_list, N):
+        sort_list = sorted(set(tmp_list), reverse=True)
         
+        sort_index = []
+        for s_l in sort_list:
+            if len(sort_index) >= N:
+                break;
+            for i in range(len(tmp_list)):
+                l = tmp_list[i]
+                if l == s_l:
+                    sort_index.append(i)
+        return sort_index
+    
 if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 50
-    itemNum = 50
+    userNum = 1000
+    itemNum = 1000
     F = 10
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1
-    # user aspect
-    alpha = 0.2
-    # item aspect
-    beta = 0.1
     para_str = str(userNum) +"_"+str(F)+"_"+str(max_iretate)+"_"+str(learnRate)+"_"+str(regularRate)
-    fpredict = froot + para_str + "_MAP_test_weight_predict.dat0"
+    fpredict = froot + para_str + "_MAP_imp_predict.dat0"
     # --- train ---
-    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate, alpha, beta)    
+    lmf = LMF(ftrain, ftest, fpredict, userNum, itemNum, F, max_iretate, learnRate, regularRate)    
     # --- get predict ---
     print "finished"
     

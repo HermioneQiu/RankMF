@@ -287,9 +287,9 @@ if __name__ == "__main__":
     froot = "E:\\workspace\\MF\\data\\cross\\"
     ftrain = froot + "train.dat0"
     ftest = froot + "test.dat0"
-    userNum = 50
-    itemNum = 50
-    F = 10
+    userNum = 300
+    itemNum = 300
+    F = 30
     max_iretate = 20
     learnRate = 0.1
     regularRate = 0.1

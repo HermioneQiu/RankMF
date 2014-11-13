@@ -82,7 +82,7 @@ class Precise:
             cor_num = 0
             basket_items = testUserBasket[user_i]
             rank_items = rank[user_i]
-            for i in range(5):
+            for i in range(10):
                 if rank_items[i] in basket_items:
                     cor_num += 1
             tmp_precise = cor_num/float(len(basket_items))
